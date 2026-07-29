@@ -1,0 +1,67 @@
+# Dependency Directories
+node_modules/
+frontend/node_modules/
+
+# Next.js Build Outputs
+.next/
+frontend/.next/
+out/
+frontend/out/
+build/
+dist/
+
+# SQLite Database Files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+gympass.db
+backend/database/gympass.db
+backend/database/gympass.db-shm
+backend/database/gympass.db-wal
+
+# Go Binaries and Executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+backend/backend
+backend/backend.exe
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+backend/.env
+backend/.env.local
+
+# Service Credentials & Accounts Keys
+firebase-service-account.json
+serviceAccountKey.json
+*.json.key
+credentials.json
+
+# IDE / Operating System Directories
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs & Temporary Cache Files
+*.log
+logs/
+tmp/
+temp/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

@@ -1,0 +1,164 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=Sora:wght@400;600;800&display=swap');
+@import "tailwindcss";
+
+:root {
+  --background: #050505;
+  --foreground: #FFFFFF;
+  --secondary: #111111;
+  --accent-red: #E10600;
+  --accent-gold: #FFD54A;
+  --accent-dark-red: #8B0000;
+  --muted-text: #A0A0A0;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --success: #31C46C;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-secondary: var(--secondary);
+  --color-red-accent: var(--accent-red);
+  --color-gold-accent: var(--accent-gold);
+  --color-dark-red-accent: var(--accent-dark-red);
+  --color-muted-gray: var(--muted-text);
+  --color-border-gym: var(--border-color);
+  --color-success-gym: var(--success);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Outfit', 'Inter', sans-serif;
+  overflow-x: hidden;
+  letter-spacing: -0.01em;
+}
+
+/* Hide standard cursor on body, restore standard pointers on interactive inputs/buttons */
+@media (pointer: fine) {
+  body {
+    cursor: none;
+  }
+  button, a, select, [role="button"], .cursor-pointer, .card-charcoal, .btn-red, .btn-gold, .btn-dark-red, tr.hover\:bg-white\/5 {
+    cursor: pointer !important;
+  }
+  input, textarea {
+    cursor: text !important;
+  }
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Red primary CTA button with hover glow and press effect */
+.btn-red {
+  background-color: var(--accent-red);
+  color: #FFFFFF;
+  border-radius: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid transparent;
+}
+.btn-red:hover {
+  background-color: #FF0A00;
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 15px rgba(225, 6, 0, 0.3), 0 0 30px rgba(255, 213, 74, 0.1);
+  transform: scale(1.02);
+}
+.btn-red:active {
+  transform: scale(0.98);
+}
+
+/* Gold Outline Secondary Button with hover glow */
+.btn-gold {
+  background-color: transparent;
+  color: var(--accent-gold);
+  border: 1.5px solid var(--accent-gold);
+  border-radius: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-gold:hover {
+  background-color: var(--accent-gold);
+  color: #050505;
+  box-shadow: 0 0 20px rgba(255, 213, 74, 0.4);
+  transform: scale(1.02);
+}
+.btn-gold:active {
+  transform: scale(0.98);
+}
+
+/* Dark Red Danger Button */
+.btn-dark-red {
+  background-color: transparent;
+  color: #FF4A4A;
+  border: 1.5px solid rgba(255, 74, 74, 0.25);
+  border-radius: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-dark-red:hover {
+  background-color: #8B0000;
+  color: #FFFFFF;
+  border-color: #8B0000;
+  box-shadow: 0 0 15px rgba(139, 0, 0, 0.4);
+  transform: scale(1.02);
+}
+.btn-dark-red:active {
+  transform: scale(0.98);
+}
+
+/* Dark Matte Card Component with Gold Highlight borders */
+.card-charcoal {
+  background-color: var(--secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-charcoal:hover {
+  border-color: rgba(255, 213, 74, 0.18);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 50px rgba(255, 213, 74, 0.03), 0 20px 60px rgba(0, 0, 0, 0.9);
+}
+
+/* Subtle performance text input with Gold outline focus states */
+.input-performance {
+  background-color: #050505;
+  border: 1px solid var(--border-color);
+  color: #FFFFFF;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+.input-performance:focus {
+  border-color: var(--accent-gold);
+  outline: none;
+  box-shadow: 0 0 10px rgba(255, 213, 74, 0.15);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-gold);
+}

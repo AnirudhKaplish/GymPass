@@ -1,0 +1,17 @@
+# SQLite database files
+database/gympass.db
+database/gympass.db-wal
+database/gympass.db-shm
+
+# Environment files
+.env
+.env.local
+
+# Compile binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+backend
