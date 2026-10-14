@@ -11,7 +11,7 @@ import (
 
 type Claims struct {
 	ID    int    `json:"id"`
-	Role  string `json:"role"` // 'user' or 'admin'
+	Role  string `json:"role"` // 'user' or 'owner'
 	Email string `json:"email,omitempty"`
 	Phone string `json:"phone,omitempty"`
 	jwt.RegisteredClaims
@@ -43,7 +43,7 @@ func ValidateToken(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(config.AppConfig.JWTSecret), nil
-	})
+	}, jwt.WithValidMethods([]string{"HS256"}))
 
 	if err != nil {
 		return nil, err

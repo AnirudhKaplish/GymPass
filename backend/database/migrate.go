@@ -8,21 +8,23 @@ import (
 
 func RunMigrations() {
 	log.Println("[MIGRATION] INFO: Starting GORM schema AutoMigrate...")
-	
+
 	err := DB.AutoMigrate(
 		&models.User{},
-		&models.Admin{},
+		&models.Owner{},
+		&models.Gym{},
+		&models.GymPhoto{},
 		&models.Plan{},
-		&models.Purchase{},
+		&models.Membership{},
 		&models.Payment{},
 		&models.Session{},
+		&models.Notification{},
 		&models.OTPLog{},
-		&models.Settings{},
 	)
-	
+
 	if err != nil {
 		log.Fatalf("[MIGRATION] FATAL: AutoMigrate failed: %v", err)
 	}
-	
+
 	log.Println("[MIGRATION] INFO: GORM AutoMigrate completed successfully.")
 }

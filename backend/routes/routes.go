@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 
+	"gympass/backend/config"
 	"gympass/backend/controllers"
 	"gympass/backend/middleware"
 
@@ -29,6 +30,9 @@ func CORSMiddleware() gin.HandlerFunc {
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
+	// Gym photo uploads are limited to 5 MB each, up to 10 per request.
+	r.MaxMultipartMemory = 8 << 20
+
 	// Apply CORS
 	r.Use(CORSMiddleware())
 
@@ -37,9 +41,12 @@ func SetupRouter() *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
 	})
 
+	// Uploaded gym photos (directory listing is off)
+	r.Static("/uploads", config.AppConfig.UploadDir)
+
 	api := r.Group("/api")
 	{
-		// 1. Public Authentication Routes
+		// 1. Member authentication (phone OTP)
 		auth := api.Group("/auth")
 		auth.Use(middleware.RateLimiter())
 		{
@@ -47,47 +54,67 @@ func SetupRouter() *gin.Engine {
 			auth.POST("/verify-otp", controllers.VerifyOTP)
 		}
 
-		// 2. Admin Auth Route
-		api.POST("/admin/login", controllers.AdminLogin)
+		// 2. Gym owner authentication (email + password)
+		api.POST("/owner/register", middleware.RateLimiter(), controllers.OwnerRegister)
+		api.POST("/owner/login", middleware.RateLimiter(), controllers.OwnerLogin)
 
-		// 3. QR Scanner Check-in/Check-out (Gym hardware endpoint)
-		api.POST("/scanner/scan", controllers.ScanQR)
-
-		// 4. User Protected Routes
+		// 3. Member routes
 		userRoutes := api.Group("/user")
 		userRoutes.Use(middleware.AuthMiddleware("user"))
 		{
 			userRoutes.POST("/onboard", controllers.OnboardUser)
 			userRoutes.GET("/dashboard", controllers.GetUserDashboard)
-			userRoutes.GET("/plans", controllers.GetActivePlans)
 			userRoutes.GET("/qr", controllers.GenerateQR)
+
+			// Find gyms: nearest first with ?lat=&lng=, search with ?q=
+			userRoutes.GET("/gyms", controllers.ListGyms)
+			userRoutes.GET("/gyms/:id", controllers.GetGymDetail)
+
+			// Buy a plan online (UPI / cards via Razorpay) or ask to pay cash
 			userRoutes.POST("/payments/initiate", controllers.InitiatePayment)
 			userRoutes.POST("/payments/verify", controllers.VerifyPayment)
+			userRoutes.POST("/memberships/cash-request", controllers.CreateCashRequest)
+			userRoutes.POST("/requests/:id/cancel", controllers.CancelCashRequest)
+
+			userRoutes.GET("/notifications", controllers.ListNotifications)
+			userRoutes.POST("/notifications/read", controllers.MarkNotificationsRead)
 		}
 
-		// 5. Admin Protected Routes
-		adminRoutes := api.Group("/admin")
-		adminRoutes.Use(middleware.AuthMiddleware("admin"))
+		// 4. Gym owner routes. Everything is scoped to gyms the owner registered.
+		ownerRoutes := api.Group("/owner")
+		ownerRoutes.Use(middleware.AuthMiddleware("owner"))
 		{
-			adminRoutes.GET("/dashboard", controllers.GetAdminDashboardStats)
-			adminRoutes.GET("/users", controllers.AdminListUsers)
-			adminRoutes.GET("/users/:id", controllers.AdminGetUserDetails)
-			adminRoutes.POST("/users/:id/suspend", controllers.AdminSuspendUser)
-			adminRoutes.POST("/users/:id/activate", controllers.AdminActivateUser)
+			ownerRoutes.GET("/me", controllers.OwnerMe)
 
-			// Plan CRUD
-			adminRoutes.GET("/plans", controllers.AdminGetAllPlans)
-			adminRoutes.POST("/plans", controllers.AdminCreatePlan)
-			adminRoutes.PUT("/plans/:id", controllers.AdminUpdatePlan)
-			adminRoutes.DELETE("/plans/:id", controllers.AdminDeletePlan)
+			// Gyms and photos
+			ownerRoutes.GET("/gyms", controllers.OwnerListGyms)
+			ownerRoutes.POST("/gyms", controllers.OwnerCreateGym)
+			ownerRoutes.GET("/gyms/:id", controllers.OwnerGetGym)
+			ownerRoutes.PUT("/gyms/:id", controllers.OwnerUpdateGym)
+			ownerRoutes.POST("/gyms/:id/photos", controllers.OwnerUploadPhotos)
+			ownerRoutes.DELETE("/gyms/:id/photos/:photoId", controllers.OwnerDeletePhoto)
 
-			// Settings Configuration
-			adminRoutes.GET("/settings", controllers.AdminGetSettings)
-			adminRoutes.PUT("/settings", controllers.AdminUpdateSettings)
+			// Plans
+			ownerRoutes.GET("/gyms/:id/plans", controllers.OwnerListPlans)
+			ownerRoutes.POST("/gyms/:id/plans", controllers.OwnerCreatePlan)
+			ownerRoutes.PUT("/plans/:planId", controllers.OwnerUpdatePlan)
+			ownerRoutes.DELETE("/plans/:planId", controllers.OwnerDeletePlan)
 
-			// Logs Lists
-			adminRoutes.GET("/payments", controllers.AdminListPayments)
-			adminRoutes.GET("/sessions", controllers.AdminListSessions)
+			// Dashboard and logs
+			ownerRoutes.GET("/gyms/:id/dashboard", controllers.OwnerDashboard)
+			ownerRoutes.GET("/gyms/:id/members", controllers.OwnerListMembers)
+			ownerRoutes.POST("/gyms/:id/members", controllers.OwnerAddMember)
+			ownerRoutes.GET("/gyms/:id/sessions", controllers.OwnerListSessions)
+			ownerRoutes.GET("/gyms/:id/payments", controllers.OwnerListPayments)
+
+			// Cash requests
+			ownerRoutes.GET("/gyms/:id/requests", controllers.OwnerListRequests)
+			ownerRoutes.POST("/requests/:id/approve", controllers.OwnerApproveRequest)
+			ownerRoutes.POST("/requests/:id/reject", controllers.OwnerRejectRequest)
+
+			// Punch members in and out
+			ownerRoutes.POST("/gyms/:id/scan", controllers.OwnerScan)
+			ownerRoutes.POST("/sessions/:id/checkout", controllers.OwnerCheckoutSession)
 		}
 	}
 

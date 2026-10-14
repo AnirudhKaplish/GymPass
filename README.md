@@ -7,27 +7,33 @@
 [![Firebase Auth](https://img.shields.io/badge/Firebase-Auth-yellow?style=flat&logo=firebase)](https://firebase.google.com)
 [![Razorpay Gateway](https://img.shields.io/badge/Razorpay-Gateway-blueviolet?style=flat)](https://razorpay.com)
 
-**GymPass Prime** is a premium, high-performance physical facility access management and ticketing system. It allows gym administrators to configure subscriptions, register hourly packages, inspect payments logs, track floor check-ins, and verify security clearances via encrypted time-decay QR tokens.
+**GymPass Prime** is a gym marketplace. Gym owners register their gym, publish plans and prices and run the front desk from a dashboard. Members find the nearest gyms, buy hours, months or years of access, and get in with a QR code.
 
-Designed with a sleek **Matte Black and Gold Energy** aesthetic, the application features smooth transitions, 3D parallax illustrations, and a canvas-driven particle trail to offer a premium, modern experience.
+Designed with a **Matte Black and Gold** look: smooth transitions, parallax layers and a canvas particle trail.
 
 ---
 
-## Key Features
+## How it works
 
-* **Firebase Phone Authentication**: Secure, server-verified OTP authentication with reCAPTCHA protection.
-* **Encrypted Time-Decay Access QR**: Dynamically rotating client-side QR codes expiring in 30 seconds to prevent key sharing.
-* **Flexible Billing & Packages**:
-  * **Hourly Packages**: Dynamic hours allocation modal (e.g. buy custom quantities of hours at a configured hourly rate).
-  * **Monthly/Periodic Subscriptions**: Traditional date-range based validity access.
-* **Interactive QR Check-In / Check-Out Console**: Simulator mimicking gym gate barcode hardware, tracking active workouts on the gym floor and automatically deducting hours.
-* **Admin Control Center**:
-  * Live monitoring of entries and floor presence.
-  * Catalog manager for CRUD plan properties.
-  * Real-time payment verification log.
-  * User profile management (directory, activation, suspension).
-  * System metadata configuration panel.
-* **Matte Black 3D Visual System**: Parallax layers, glowing gold particle trails, and responsive grids.
+**Members**
+* Sign in with a phone OTP (Firebase), then open **Gyms** to see gyms nearest to you. The search icon finds a gym by name, area or city.
+* Each gym page shows photos, a Google Maps view with directions, and its plans.
+* Pay with **GPay, Paytm or any UPI app** (Razorpay checkout), or **request cash payment** and let the owner approve it.
+* The main dashboard lists every membership with time remaining. Prepaid hours count down live while you are inside.
+* Show your QR at the gym to **punch in**, scan again to **punch out**. The QR is single-use and valid for 60 seconds.
+* Notifications warn you before a plan ends (3 days and 1 day for date plans, 2 hours and 30 minutes for prepaid hours).
+
+**Plans**
+* **Prepaid hours** (for example 5 h): only the time you actually spend inside is deducted, however many days it spans. Price is per hour; the owner chooses whether hours expire.
+* **Monthly / quarterly / half-yearly / yearly**: fixed duration from the day of purchase.
+* Buying the same plan at the same gym again extends it.
+
+**Gym owners** (email + password, separate from members)
+* Register a gym with name, address and a map location (use my location, paste a Google Maps link, or enter coordinates), plus optional photos.
+* Set plan types and prices. One owner can run several gyms.
+* Dashboard: who is inside right now, busiest hours (today and 30-day average), entries, members, revenue, recent visits and payments.
+* Scan members at the door with the camera (or paste a code), approve or reject cash requests, browse members, visits and payments.
+* A visit that is never punched out is closed automatically after `MAX_SESSION_HOURS` (default 6) so a forgotten scan cannot drain prepaid hours.
 
 ---
 
@@ -35,12 +41,13 @@ Designed with a sleek **Matte Black and Gold Energy** aesthetic, the application
 
 ```mermaid
 graph TD
-    A[Gym Member / Admin Client] -->|Next.js Web App| B(Firebase Web SDK Auth)
-    A -->|Access requests| C[Go Gin REST API]
-    B -->|Binds ID Token| C
-    C -->|Verifies Token| D[Firebase Admin Go SDK]
-    C -->|Queries / Transactions| E[GORM SQLite Engine]
-    C -->|Binds Payment Checkout| F[Razorpay Gateway Client]
+    A[Member / Owner Client] -->|Next.js Web App| B(Firebase Web SDK Auth)
+    A -->|REST| C[Go Gin API]
+    B -->|ID Token| C
+    C -->|Queries / Transactions| E[GORM SQLite or Postgres]
+    C -->|Orders + signature check| F[Razorpay]
+    C -->|Photos| G[uploads/ on disk]
+    A -->|Embed + links| H[Google Maps]
 ```
 
 ---
@@ -48,7 +55,7 @@ graph TD
 ## Installation & Local Setup
 
 ### Prerequisite Environment
-- **Go**: Version `1.22` or higher.
+- **Go**: Version `1.25` or higher (see `backend/go.mod`).
 - **NodeJS**: Version `20` or higher.
 - **SQLite**: Automatic setup managed by GORM.
 
@@ -64,20 +71,16 @@ graph TD
    ```bash
    cp .env.example .env
    ```
-3. Edit the `.env` file with your credentials (e.g., your Razorpay IDs, Firebase Project ID):
+3. Edit the `.env` file. For local development the defaults in `.env.example` work as they are:
    ```env
    PORT=8080
-   JWT_SECRET=your_jwt_secret_key_here
-   DB_DRIVER=sqlite
-   DB_PATH=database/gympass.db
+   JWT_SECRET=change_me
+   DEV_MODE=true            # any 6-digit OTP works, Razorpay is mocked, demo data is seeded
    RAZORPAY_KEY_ID=rzp_test_mock_id_123
    RAZORPAY_KEY_SECRET=rzp_test_mock_secret_abc
-   ADMIN_EMAIL=admin@gympass.com
-   ADMIN_PASSWORD=admin123
-   ADMIN_PHONES="+919876543210,+919999999999"
-   DEV_MODE=true
-   FIREBASE_PROJECT_ID=gympass-587a1
+   FIREBASE_PROJECT_ID=your_firebase_project_id
    ```
+   `DEV_MODE` is **off by default**. Never run production with it on.
 4. Fetch dependencies and run the server (GORM will auto-migrate and seed the database tables):
    ```bash
    go run main.go
@@ -114,46 +117,62 @@ graph TD
 
 ---
 
-## Database Schema (GORM SQLite Entity Relationships)
+### Demo data (DEV_MODE)
 
-* **Admins**: Store email and password hashes for direct administrative entrance logs.
-* **Users**: Tracks phone number, onboarding data, active statuses, and `firebase_uid`.
-* **Plans**: Subscription plans catalog (hourly/periodic validity, prices, default hours).
-* **Payments**: Order records log connecting Razorpay checkouts, dynamic hours quantities, and verification signatures.
-* **Purchases**: Active user packages, expiration limits, and remaining time balances.
-* **Sessions**: Logs member floor workouts (check-in/check-out timestamps, elapsed seconds, hours deducted).
-* **Settings**: Global facility parameters (gym name, hours, contact address, branding attributes).
+On first start the server seeds an owner and two Bengaluru gyms with plans:
+
+* Owner login at `/owner/login`: `owner@gympass.com` / `owner12345`
+* Members sign in at `/auth` with any phone number and any 6-digit OTP.
+
+If you used an older version of this project, delete `backend/database/gympass.db` once: the schema changed.
+
+### Trying it end to end
+
+1. Sign in as a member, open **Gyms**, buy a plan (mock payment) or send a cash request.
+2. Sign in as the owner in another browser profile, approve the cash request, open **Scan**.
+3. Paste the member's QR code (the member dashboard shows a new one every 60 s) to punch in, scan another to punch out.
+
+### Payments
+
+Razorpay's checkout offers Google Pay, Paytm, PhonePe, other UPI apps, cards and netbanking once real keys are set. All online payments go to the single Razorpay account in `.env`. Paying each gym owner directly needs Razorpay Route (not included).
+
+### Maps
+
+The map is Google Maps' keyless embed plus "Open in Google Maps" and "Directions" links, so no API key is needed. Owners set the pin with browser location, a pasted Maps link or coordinates; address search and autocomplete would need a Maps Platform key.
 
 ---
 
 ## Core API Endpoints
 
-### Public Gate
-- `POST /api/auth/send-otp` — Dispatches SMS code (in sandbox, prints mock code to terminal).
-- `POST /api/auth/verify-otp` — Validates Firebase ID tokens, maps user roles, and issues GymPass JWT.
-- `POST /api/admin/login` — Direct credential login for administrators.
+Full list in `backend/README.md`.
 
-### Member Gate (JWT User Token required)
-- `POST /api/user/onboard` — Records registration profile name, age, gender.
-- `GET /api/user/dashboard` — Fetches active subscriptions and workout entries history.
-- `GET /api/user/qr` — Generates a 30s decay cryptographically signed check-in token.
-- `POST /api/user/payments/initiate` — Initiates Razorpay checkout orders for custom hours.
-- `POST /api/user/payments/verify` — Validates Razorpay signatures and provisions the purchased hours.
+* Public: `POST /api/auth/send-otp`, `POST /api/auth/verify-otp`, `POST /api/owner/register`, `POST /api/owner/login`
+* Member (`/api/user/...`): `dashboard`, `qr`, `gyms`, `gyms/:id`, `payments/initiate`, `payments/verify`, `memberships/cash-request`, `requests/:id/cancel`, `notifications`
+* Owner (`/api/owner/...`): `gyms` (CRUD + photos), `gyms/:id/plans`, `gyms/:id/dashboard`, `members`, `sessions`, `payments`, `requests`, `requests/:id/approve|reject`, `gyms/:id/scan`
 
-### Admin Gate (JWT Admin Token required)
-- `GET /api/admin/dashboard` — Total member counts, today's revenues, active floor check-ins.
-- `GET /api/admin/users` — Browse member database, suspend, or reactivate accounts.
-- `GET/POST/PUT/DELETE /api/admin/plans` — Catalog plans manager.
-- `GET /api/admin/payments` — Transacted checkout history inspector.
-- `GET /api/admin/sessions` — Active gym floor check-in monitoring.
-- `PUT /api/admin/settings` — Configure gym details, working hours, and branding parameters.
+---
+
+## Going live
+
+See `DEPLOY.md` for Firebase SMS login, real Razorpay keys, Docker and HTTPS.
+
+---
+
+## Tests
+
+```bash
+cd backend && go build ./... && go test ./...
+```
+
+`backend/routes/e2e_test.go` walks the whole flow: owner and gym setup, nearby search, cash approval, hourly deduction, single-use QR, online payment idempotency, expiry reminders and owner isolation.
 
 ---
 
 ## Future Release Roadmap
 - **Production Migrations**: PostgreSQL driver option settings for heavy concurrency.
-- **Native Webcam Scanning**: Integrations of visual scan readers on tablet stands.
-- **Active Notifications Hook**: Integration of Twilio SMS / WhatsApp check-in summaries.
+- **Push / SMS delivery**: notifications are in-app today; `services.SendNotification` is the hook for FCM, SMS or WhatsApp.
+- **Per-owner payouts** with Razorpay Route, and address search with a Maps Platform key.
+- **Photo storage** in object storage instead of local disk.
 
 ---
 
