@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { userApi, setAuthToken } from '../../lib/api';
+import { userApi, setAuth } from '../../lib/api';
 import { Dumbbell, Phone, KeyRound, Loader2, ArrowLeft, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 
@@ -133,22 +133,11 @@ function AuthForm() {
         verifyRes = await userApi.verifyOTP(phone, undefined, otp);
       }
 
-      // 3. Backend Role Redirection Flow
-      if (verifyRes.role === 'admin') {
-        setAuthToken(verifyRes.token);
-        localStorage.setItem('gympass_admin_email', verifyRes.admin_email || 'admin@gympass.com');
-        router.push('/admin/dashboard');
-      } else {
-        setAuthToken(verifyRes.token);
-        localStorage.setItem('gympass_phone', phone);
-        localStorage.setItem('gympass_onboarded', String(verifyRes.is_onboarded));
-
-        if (verifyRes.is_onboarded) {
-          router.push('/dashboard');
-        } else {
-          router.push('/auth/onboarding');
-        }
-      }
+      // 3. Members only: owners sign in with email and password at /owner/login
+      setAuth(verifyRes.token, 'user');
+      localStorage.setItem('gympass_phone', phone);
+      localStorage.setItem('gympass_onboarded', String(verifyRes.is_onboarded));
+      router.push(verifyRes.is_onboarded ? '/dashboard' : '/auth/onboarding');
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'OTP verification failed. Check the code.');
@@ -272,6 +261,11 @@ function AuthForm() {
             </div>
           </form>
         )}
+
+        <p className="text-center text-[10px] text-[#A0A0A0] font-bold uppercase tracking-widest mt-6">
+          Own a gym?{' '}
+          <a href="/owner/login" className="text-[#FFD54A] hover:underline">Owner sign in</a>
+        </p>
       </div>
 
       {/* Invisible container for mounting Firebase reCAPTCHA */}

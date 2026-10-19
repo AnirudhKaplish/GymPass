@@ -18,35 +18,47 @@ type OnboardingRequest struct {
 	Gender string `json:"gender" binding:"required"`
 }
 
-type AdminLoginRequest struct {
+type OwnerRegisterRequest struct {
+	Name     string `json:"name" binding:"required,max=100"`
+	Email    string `json:"email" binding:"required,email"`
+	Phone    string `json:"phone"`
+	Password string `json:"password" binding:"required,min=8,max=72"`
+}
+
+type OwnerLoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
 
-type CreatePlanRequest struct {
-	Name         string  `json:"name" binding:"required"`
-	Type         string  `json:"type" binding:"required"` // 'monthly', 'quarterly', 'half-yearly', 'yearly', 'hourly'
+// GymRequest is used both to register a gym and to edit it.
+type GymRequest struct {
+	Name          string   `json:"name" binding:"required,max=100"`
+	Description   string   `json:"description"`
+	Address       string   `json:"address" binding:"required"`
+	City          string   `json:"city"`
+	Latitude      *float64 `json:"latitude" binding:"required,gte=-90,lte=90"`
+	Longitude     *float64 `json:"longitude" binding:"required,gte=-180,lte=180"`
+	ContactNumber string   `json:"contact_number"`
+	OpeningTime   string   `json:"opening_time"`
+	ClosingTime   string   `json:"closing_time"`
+	Timezone      string   `json:"timezone"`
+	Status        string   `json:"status"` // optional on edit: 'active' or 'inactive'
+}
+
+type PlanRequest struct {
+	Name         string  `json:"name" binding:"required,max=100"`
+	Type         string  `json:"type" binding:"required,oneof=hourly monthly quarterly half-yearly yearly"`
 	Price        float64 `json:"price" binding:"required,gt=0"`
-	ValidityDays int     `json:"validity_days" binding:"required,gt=0"`
-	LimitHours   *int    `json:"limit_hours"` // Optional: only for hourly
+	ValidityDays int     `json:"validity_days" binding:"gte=0"`
 	Description  string  `json:"description"`
+	Status       string  `json:"status"` // optional on edit: 'active' or 'inactive'
+	IsVisible    *bool   `json:"is_visible"`
 }
 
-type UpdateSettingsRequest struct {
-	GymName       string `json:"gym_name" binding:"required"`
-	LogoURL       string `json:"logo_url"`
-	Address       string `json:"address"`
-	ContactNumber string `json:"contact_number"`
-	Email         string `json:"email" binding:"required,email"`
-	OpeningTime   string `json:"opening_time"`
-	ClosingTime   string `json:"closing_time"`
-	Currency      string `json:"currency"`
-	Timezone      string `json:"timezone"`
-}
-
-type InitiatePaymentRequest struct {
+// PurchaseRequest starts an online payment or files a cash request.
+type PurchaseRequest struct {
 	PlanID int  `json:"plan_id" binding:"required"`
-	Hours  *int `json:"hours"` // Optional: selected quantity of hours for hourly plans
+	Hours  *int `json:"hours"` // required for hourly plans
 }
 
 type VerifyPaymentRequest struct {
@@ -57,4 +69,16 @@ type VerifyPaymentRequest struct {
 
 type ScanQRRequest struct {
 	Token string `json:"token" binding:"required"`
+}
+
+type MarkReadRequest struct {
+	IDs []uint `json:"ids"` // empty = mark everything read
+}
+
+// AddMemberRequest lets an owner sign up a walk-in member who pays at the desk.
+type AddMemberRequest struct {
+	Phone  string `json:"phone" binding:"required"`
+	Name   string `json:"name"`
+	PlanID int    `json:"plan_id" binding:"required"`
+	Hours  *int   `json:"hours"` // required for hourly plans
 }

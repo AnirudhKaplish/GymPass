@@ -7,8 +7,8 @@ import (
 
 	"gympass/backend/config"
 
-	"gorm.io/driver/postgres"
 	"github.com/glebarez/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -39,6 +39,11 @@ func ConnectDatabase() {
 	gormConfig := &gorm.Config{
 		PrepareStmt: true, // Enable prepared statements for performance
 		Logger:      gormLogger,
+		// Relations are resolved with Preload; skipping DB-level foreign keys keeps
+		// AutoMigrate simple on SQLite and PostgreSQL alike.
+		DisableForeignKeyConstraintWhenMigrating: true,
+		// Store every timestamp in UTC so range comparisons are consistent.
+		NowFunc: func() time.Time { return time.Now().UTC() },
 	}
 
 	driver := config.AppConfig.DBDriver

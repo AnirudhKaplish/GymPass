@@ -1,9 +1,10 @@
 package controllers
 
 import (
+	crand "crypto/rand"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -25,29 +26,26 @@ func SendOTP(c *gin.Context) {
 		return
 	}
 
-	// Generate OTP (e.g. 6-digit)
-	// In dev mode, we can use "123456" for convenience, or random. Let's make it random but return it in response if in dev mode
-	rand.Seed(time.Now().UnixNano())
-	otp := ""
-	if config.AppConfig.DevMode {
-		otp = "123456"
-	} else {
-		// Generate random 6-digit
-		otpCode := 100000 + rand.Intn(900000)
-		otp = string(rune(otpCode))
+	// Dev mode uses a fixed code for convenience; otherwise a random 6-digit code.
+	otp := "123456"
+	if !config.AppConfig.DevMode {
+		n, err := crand.Int(crand.Reader, big.NewInt(900000))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate OTP"})
+			return
+		}
+		otp = fmt.Sprintf("%06d", 100000+n.Int64())
 	}
 
-	expiresAt := time.Now().Add(5 * time.Minute)
-	err := repository.CreateOTPLog(req.Phone, otp, expiresAt)
-	if err != nil {
+	expiresAt := time.Now().UTC().Add(time.Duration(config.AppConfig.OTPExpiry) * time.Second)
+	if err := repository.CreateOTPLog(req.Phone, otp, expiresAt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create OTP log"})
 		return
 	}
 
-	log.Printf("[SMS OTP] To Phone: %s | OTP: %s", req.Phone, otp)
-
 	response := gin.H{"message": "OTP sent successfully"}
 	if config.AppConfig.DevMode {
+		log.Printf("[SMS OTP] To Phone: %s | OTP: %s", req.Phone, otp)
 		response["otp_dev_bypass"] = otp // Send OTP in response for developers
 	}
 
@@ -68,7 +66,7 @@ func normalizePhone(p string) string {
 	return res
 }
 
-// VerifyOTP checks OTP and logs in / signs up user
+// VerifyOTP checks OTP and logs in / signs up a member
 func VerifyOTP(c *gin.Context) {
 	var req models.VerifyOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -101,7 +99,7 @@ func VerifyOTP(c *gin.Context) {
 			return
 		}
 	} else {
-		// Fall back to legacy mock database OTP validation
+		// Fall back to legacy mock database OTP validation (dev mode only)
 		otpLog, err := repository.GetLastUnverifiedOTP(req.Phone)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error checking OTP"})
@@ -121,8 +119,7 @@ func VerifyOTP(c *gin.Context) {
 		}
 
 		if otpLog != nil {
-			err = repository.VerifyOTPLog(otpLog.ID)
-			if err != nil {
+			if err := repository.VerifyOTPLog(otpLog.ID); err != nil {
 				log.Println("Warning: Failed to mark OTP log verified:", err)
 			}
 		}
@@ -131,52 +128,10 @@ func VerifyOTP(c *gin.Context) {
 
 	normPhone := normalizePhone(verifiedPhone)
 
-	// Admin Check: Compare against ADMIN_PHONES
-	isAdmin := false
-	adminPhonesList := strings.Split(config.AppConfig.AdminPhones, ",")
-	for _, ap := range adminPhonesList {
-		if normalizePhone(strings.TrimSpace(ap)) == normPhone {
-			isAdmin = true
-			break
-		}
-	}
-
-	if isAdmin {
-		// Admin Flow: find or create Admin GORM entry
-		var admin models.Admin
-		err := database.DB.Where("email = ?", config.AppConfig.AdminEmail).First(&admin).Error
-		if err != nil {
-			// Create default admin if not found
-			admin = models.Admin{
-				Email:        config.AppConfig.AdminEmail,
-				PasswordHash: "", // Firebase auth used instead of password
-			}
-			if err := database.DB.Create(&admin).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Admin account record"})
-				return
-			}
-		}
-
-		// Generate Admin JWT
-		token, err := utils.GenerateToken(int(admin.ID), "admin", admin.Email, normPhone)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate Admin token"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"token":       token,
-			"role":        "admin",
-			"admin_email": admin.Email,
-		})
-		return
-	}
-
-	// Member Flow: find or create User GORM entry
+	// Find or create the member
 	var user models.User
 	err := database.DB.Where("phone = ? OR phone = ?", normPhone, req.Phone).First(&user).Error
 	if err != nil {
-		// GORM record not found, create new user
 		user = models.User{
 			Phone:  normPhone,
 			Status: "active",
@@ -188,26 +143,19 @@ func VerifyOTP(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create User record"})
 			return
 		}
-	} else {
-		// User exists. Update FirebaseUID if empty
-		if firebaseUID != "" && (user.FirebaseUID == nil || *user.FirebaseUID == "") {
-			user.FirebaseUID = &firebaseUID
-			database.DB.Save(&user)
-		}
+	} else if firebaseUID != "" && (user.FirebaseUID == nil || *user.FirebaseUID == "") {
+		user.FirebaseUID = &firebaseUID
+		database.DB.Save(&user)
 	}
 
 	if user.Status == "suspended" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Your account has been suspended by the administrator."})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Your account has been suspended."})
 		return
 	}
 
 	// Determine if user profile onboarding is complete
-	isOnboarded := false
-	if user.Name != nil && *user.Name != "" && user.Age != nil && user.Gender != nil {
-		isOnboarded = true
-	}
+	isOnboarded := user.Name != nil && *user.Name != "" && user.Age != nil && user.Gender != nil
 
-	// Generate Member JWT
 	token, err := utils.GenerateToken(int(user.ID), "user", "", user.Phone)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate User token"})
@@ -224,15 +172,13 @@ func VerifyOTP(c *gin.Context) {
 
 // OnboardUser completes initial user details
 func OnboardUser(c *gin.Context) {
-	userID, _ := c.Get("userID")
-
 	var req models.OnboardingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	user, err := repository.GetUserByID(userID.(int))
+	user, err := repository.GetUserByID(currentID(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user"})
 		return
@@ -246,8 +192,7 @@ func OnboardUser(c *gin.Context) {
 	user.Age = &req.Age
 	user.Gender = &req.Gender
 
-	err = repository.UpdateUser(user)
-	if err != nil {
+	if err := repository.UpdateUser(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
 		return
 	}
@@ -258,116 +203,15 @@ func OnboardUser(c *gin.Context) {
 	})
 }
 
-// GetUserDashboard returns dashboard aggregated data
-func GetUserDashboard(c *gin.Context) {
-	userID, _ := c.Get("userID")
-
-	// 1. Fetch User details
-	user, err := repository.GetUserByID(userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error fetching user"})
-		return
-	}
-	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-		return
-	}
-
-	if user.Status == "suspended" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Account suspended"})
-		return
-	}
-
-	// 2. Fetch Active Purchase (active plan)
-	activePurchase, err := repository.GetActivePurchaseForUser(userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error checking subscriptions"})
-		return
-	}
-
-	// 3. Fetch Active Gym Settings
-	settings, err := repository.GetSettings()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error loading settings"})
-		return
-	}
-
-	// 4. Check for active session
-	activeSession, err := repository.GetActiveSessionForUser(userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error checking check-ins"})
-		return
-	}
-
-	// 5. Fetch Session History
-	sessions, err := repository.GetUserSessions(userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error fetching sessions"})
-		return
-	}
-
-	// Format sessions history nicely
-	type SessionHistoryItem struct {
-		ID            int        `json:"id"`
-		EntryTime     time.Time  `json:"entry_time"`
-		ExitTime      *time.Time `json:"exit_time"`
-		Duration      string     `json:"duration"`
-		HoursDeducted float64    `json:"hours_deducted"`
-		Status        string     `json:"status"`
-	}
-
-	history := []SessionHistoryItem{}
-	for _, s := range sessions {
-		durationStr := "In Progress"
-		hoursDeductedVal := 0.0
-
-		if s.ExitTime != nil {
-			dur := s.ExitTime.Sub(s.EntryTime)
-			h := int(dur.Hours())
-			m := int(dur.Minutes()) % 60
-			if h > 0 {
-				durationStr = fmt.Sprintf("%dh %dm", h, m)
-			} else {
-				durationStr = fmt.Sprintf("%dm", m)
-			}
-		}
-
-		if s.HoursDeducted != nil {
-			hoursDeductedVal = *s.HoursDeducted
-		}
-
-		history = append(history, SessionHistoryItem{
-			ID:            int(s.ID),
-			EntryTime:     s.EntryTime,
-			ExitTime:      s.ExitTime,
-			Duration:      durationStr,
-			HoursDeducted: hoursDeductedVal,
-			Status:        s.Status,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"user":            user,
-		"active_purchase": activePurchase,
-		"settings":        settings,
-		"active_session":  activeSession,
-		"sessions":        history,
-	})
-}
-
-// GenerateQR generates a new QR code token
+// GenerateQR generates a new QR code token for the member. The same QR works at
+// every gym; the gym is decided by whose scanner reads it.
 func GenerateQR(c *gin.Context) {
-	userID, _ := c.Get("userID")
-
-	// Verify user is active
-	user, err := repository.GetUserByID(userID.(int))
-	if err != nil || user == nil || user.Status == "suspended" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "User suspended or not found"})
+	user, ok := activeUser(c)
+	if !ok {
 		return
 	}
 
-	// Generate QR token
-	token, err := utils.GenerateQRToken(userID.(int))
+	token, err := utils.GenerateQRToken(int(user.ID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate QR token"})
 		return

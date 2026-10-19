@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Dumbbell, QrCode, Clock, ShieldCheck } from 'lucide-react';
+import { Dumbbell, QrCode, Clock, MapPin } from 'lucide-react';
 
 export default function RedesignedLandingPage() {
   return (
@@ -33,16 +33,22 @@ export default function RedesignedLandingPage() {
             GYM<span className="text-[#E10600]">PASS</span>
           </h1>
           <p className="text-sm md:text-base font-extrabold text-[#A0A0A0] uppercase tracking-[0.15em] max-w-xl mx-auto mt-2">
-            Modern Gym Membership Management
+            One pass. Every gym near you.
           </p>
         </div>
 
-        <div className="flex justify-center mt-6">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6">
           <Link
             href="/auth"
             className="px-10 py-4.5 btn-red text-xs font-black shadow-xl flex items-center justify-center gap-2 max-w-[240px] w-full"
           >
-            Get Started
+            Find a gym
+          </Link>
+          <Link
+            href="/owner/login"
+            className="px-10 py-4.5 btn-gold text-xs font-black shadow-xl flex items-center justify-center gap-2 max-w-[240px] w-full"
+          >
+            I own a gym
           </Link>
         </div>
 
@@ -55,7 +61,7 @@ export default function RedesignedLandingPage() {
             </div>
             <h3 className="font-extrabold text-xs text-white uppercase tracking-wider mt-1">QR Access Keys</h3>
             <p className="text-xs text-[#A0A0A0] leading-relaxed">
-              Scan dynamic, self-refreshing QR codes at facility checkpoints for instant access verification.
+              Sign in, show your QR and get punched in at the gym. Scan again on the way out to stop the clock.
             </p>
           </div>
 
@@ -66,18 +72,18 @@ export default function RedesignedLandingPage() {
             </div>
             <h3 className="font-extrabold text-xs text-white uppercase tracking-wider mt-1">Hourly Passes</h3>
             <p className="text-xs text-[#A0A0A0] leading-relaxed">
-              Purchase flexible hour packs. Pay only for the active seconds you spend inside the workout floors.
+              Buy hours, months or years. Prepaid hours only count the time you actually spend inside, over any number of days.
             </p>
           </div>
 
           {/* Card 3 */}
           <div className="card-charcoal p-6 flex flex-col gap-3 bg-[#111111] border border-[rgba(255,255,255,0.08)] rounded-xl">
             <div className="w-9 h-9 bg-black rounded-lg border border-[rgba(255,255,255,0.08)] flex items-center justify-center text-[#FFD54A]">
-              <ShieldCheck className="w-4.5 h-4.5" />
+              <MapPin className="w-4.5 h-4.5" />
             </div>
-            <h3 className="font-extrabold text-xs text-white uppercase tracking-wider mt-1">Secure Checkpoint</h3>
+            <h3 className="font-extrabold text-xs text-white uppercase tracking-wider mt-1">Nearest gyms</h3>
             <p className="text-xs text-[#A0A0A0] leading-relaxed">
-              Verify transactions and monitor floor capacity in real-time with an intuitive, unified dashboard.
+              Browse gyms on the map, pay with GPay, Paytm or UPI, or pay cash and let the owner approve. Get a reminder before your plan ends.
             </p>
           </div>
         </div>

@@ -1,0 +1,9 @@
+{
+  "appId": "com.gympass.app",
+  "appName": "GymPass",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["*"]
+  }
+}

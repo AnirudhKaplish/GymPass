@@ -21,6 +21,10 @@ backend/database/gympass.db
 backend/database/gympass.db-shm
 backend/database/gympass.db-wal
 
+# Uploaded gym photos
+backend/uploads/
+uploads/
+
 # Go Binaries and Executables
 *.exe
 *.exe~

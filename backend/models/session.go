@@ -6,20 +6,33 @@ import (
 	"gorm.io/gorm"
 )
 
+// Session statuses
+const (
+	SessionActive     = "active"
+	SessionCompleted  = "completed"
+	SessionAutoClosed = "auto_closed" // member forgot to punch out
+)
+
+// Session is one visit: punch-in at the gym, punch-out when the workout ends.
 type Session struct {
 	ID              uint           `json:"id" gorm:"primaryKey"`
 	UUID            string         `json:"uuid" gorm:"type:varchar(36);uniqueIndex;not null"`
 	UserID          uint           `json:"user_id" gorm:"not null;index"`
+	GymID           uint           `json:"gym_id" gorm:"not null;default:0;index"`
+	MembershipID    uint           `json:"membership_id" gorm:"not null;default:0;index"`
 	EntryTime       time.Time      `json:"entry_time" gorm:"not null;index"`
 	ExitTime        *time.Time     `json:"exit_time"`
 	DurationSeconds *int           `json:"duration_seconds"`
 	HoursDeducted   *float64       `json:"hours_deducted"`
-	Status          string         `json:"status" gorm:"type:varchar(50);default:'active';index"` // 'active', 'completed', 'aborted'
+	Status          string         `json:"status" gorm:"type:varchar(50);default:'active';index"`
 	DeletedAt       gorm.DeletedAt `json:"-" gorm:"index"`
 
-	// Join helper fields (ignored by GORM mapping)
+	// Helper fields (ignored by GORM mapping)
 	UserName  string `json:"user_name,omitempty" gorm:"-"`
 	UserPhone string `json:"user_phone,omitempty" gorm:"-"`
+	GymName   string `json:"gym_name,omitempty" gorm:"-"`
+	PlanName  string `json:"plan_name,omitempty" gorm:"-"`
+	PlanType  string `json:"plan_type,omitempty" gorm:"-"`
 }
 
 func (Session) TableName() string {
