@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import jsQR from 'jsqr';
 import { Camera, CameraOff, CheckCircle2, Loader2, LogIn, LogOut, XCircle } from 'lucide-react';
 import { ScanResult, ownerApi } from '../../../../lib/api';
 import { PageTitle } from '../../../../components/OwnerUI';
@@ -52,9 +53,8 @@ export default function ScanPage() {
 
   const startCamera = async () => {
     setCameraError('');
-    const Detector = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector;
-    if (!Detector) {
-      setCameraError('This browser cannot read QR codes from the camera. Use Chrome or Edge, or paste the code below.');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera is not available here. It needs a secure (https) address. You can paste the code below instead.');
       return;
     }
     try {
@@ -62,7 +62,7 @@ export default function ScanPage() {
       streamRef.current = stream;
       setCameraOn(true);
     } catch {
-      setCameraError('Camera access was blocked. Allow it in the browser, or paste the code below.');
+      setCameraError('Camera access was blocked. Allow the camera for this app in your phone settings, or paste the code below.');
     }
   };
 
@@ -71,13 +71,28 @@ export default function ScanPage() {
     const video = videoRef.current;
     video.srcObject = streamRef.current;
     video.play().catch(() => undefined);
-    const Detector = (window as unknown as { BarcodeDetector: BarcodeDetectorCtor }).BarcodeDetector;
-    const detector = new Detector({ formats: ['qr_code'] });
+    // Use the built-in detector when the browser has one; otherwise decode frames with jsQR
+    // (the Android app's web view has no BarcodeDetector).
+    const Detector = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector;
+    const detector = Detector ? new Detector({ formats: ['qr_code'] }) : null;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const timer = setInterval(async () => {
       if (video.readyState < 2 || busyRef.current) return;
       try {
-        const codes = await detector.detect(video);
-        if (codes[0]?.rawValue) submit(codes[0].rawValue);
+        if (detector) {
+          const codes = await detector.detect(video);
+          if (codes[0]?.rawValue) submit(codes[0].rawValue);
+          return;
+        }
+        if (!ctx || !video.videoWidth) return;
+        const scale = Math.min(1, 640 / video.videoWidth);
+        canvas.width = Math.round(video.videoWidth * scale);
+        canvas.height = Math.round(video.videoHeight * scale);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if (code?.data) submit(code.data);
       } catch {
         /* a frame that cannot be read is skipped */
       }

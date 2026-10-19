@@ -2,11 +2,11 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
-    push:
-      branches: [gym-marketplace]
-      paths:
-        - "mobile/**"
-        - ".github/workflows/android-apk.yml"
+  push:
+    branches: [gym-marketplace]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/android-apk.yml"
 
 permissions:
   contents: write
@@ -38,7 +38,7 @@ jobs:
 
       - name: Allow location (for nearest gyms)
         run: |
-          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n</manifest>#' mobile/android/app/src/main/AndroidManifest.xml
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n</manifest>#' mobile/android/app/src/main/AndroidManifest.xml
           grep -n "uses-permission" mobile/android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK
